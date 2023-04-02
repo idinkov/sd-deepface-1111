@@ -222,38 +222,39 @@ def step_4_face_swapper(face_align_images,
                         presharpen_amount=2,
                         two_pass=False,
                         morph_factor=0):
-    path = Path(dfm_model)
-    dfm_model = DFMModel(path, device_info)
 
     face_output = []
 
-    for face_align_image in face_align_images:
-        pre_gamma_red, pre_gamma_green, pre_gamma_blue = list(pre_gamma)
-        post_gamma_red, post_gamma_green, post_gamma_blue = list(post_gamma)
+    for image_id, faces in enumerate(face_align_images):
+        face_iterration_output = []
+        for face_align_image in faces:
+            pre_gamma_red, pre_gamma_green, pre_gamma_blue = list(pre_gamma)
+            post_gamma_red, post_gamma_green, post_gamma_blue = list(post_gamma)
 
-        fai_ip = ImageProcessor(face_align_image)
-        if presharpen_amount != 0:
-            fai_ip.gaussian_sharpen(sigma=1.0, power=presharpen_amount)
+            fai_ip = ImageProcessor(face_align_image)
+            if presharpen_amount != 0:
+                fai_ip.gaussian_sharpen(sigma=1.0, power=presharpen_amount)
 
-        if pre_gamma_red != 1.0 or pre_gamma_green != 1.0 or pre_gamma_blue != 1.0:
-            fai_ip.gamma(pre_gamma_red, pre_gamma_green, pre_gamma_blue)
-        face_align_image = fai_ip.get_image('NHWC')
+            if pre_gamma_red != 1.0 or pre_gamma_green != 1.0 or pre_gamma_blue != 1.0:
+                fai_ip.gamma(pre_gamma_red, pre_gamma_green, pre_gamma_blue)
+            face_align_image = fai_ip.get_image('NHWC')
 
-        celeb_face, celeb_face_mask_img, face_align_mask_img = dfm_model.convert(face_align_image,
-                                                                                 morph_factor=morph_factor)
-        celeb_face, celeb_face_mask_img, face_align_mask_img = celeb_face[0], celeb_face_mask_img[0], \
-        face_align_mask_img[0]
+            celeb_face, celeb_face_mask_img, face_align_mask_img = dfm_model.convert(face_align_image,
+                                                                                     morph_factor=morph_factor)
+            celeb_face, celeb_face_mask_img, face_align_mask_img = celeb_face[0], celeb_face_mask_img[0], \
+            face_align_mask_img[0]
 
-        if two_pass:
-            celeb_face, celeb_face_mask_img, _ = dfm_model.convert(celeb_face,
-                                                                   morph_factor=morph_factor)
-            celeb_face, celeb_face_mask_img = celeb_face[0], celeb_face_mask_img[0]
+            if two_pass:
+                celeb_face, celeb_face_mask_img, _ = dfm_model.convert(celeb_face,
+                                                                       morph_factor=morph_factor)
+                celeb_face, celeb_face_mask_img = celeb_face[0], celeb_face_mask_img[0]
 
-        if post_gamma_red != 1.0 or post_gamma_blue != 1.0 or post_gamma_green != 1.0:
-            celeb_face = ImageProcessor(celeb_face).gamma(post_gamma_red, post_gamma_blue,
-                                                          post_gamma_green).get_image('HWC')
+            if post_gamma_red != 1.0 or post_gamma_blue != 1.0 or post_gamma_green != 1.0:
+                celeb_face = ImageProcessor(celeb_face).gamma(post_gamma_red, post_gamma_blue,
+                                                              post_gamma_green).get_image('HWC')
 
-        face_output.append([face_align_mask_img, celeb_face, celeb_face_mask_img])
+            face_iterration_output.append([face_align_mask_img, celeb_face, celeb_face_mask_img])
+        face_output.append(face_iterration_output)
 
     return face_output
 
@@ -423,7 +424,7 @@ def step_5_face_merger(frame_image,
 
 from xlib.onnxruntime import (get_available_devices_info)
 
-def execute_deep_face_live( numpy_image,
+def execute_deep_face_live_multiple( numpy_images,
                             dfm_path,
                             device_id = 0,
                             step_1_detector = DetectorType.YOLOV5,
@@ -464,44 +465,48 @@ def execute_deep_face_live( numpy_image,
                             step_5_color_compression=0,
                             step_5_face_opacity=1
                            ):
-    print("Numpy array shape:", numpy_image.shape)
-    available_devices = get_available_devices_info()
-    device_info = available_devices[int(device_id)]
+    faces_array = []
+    for image_id, numpy_image in enumerate(numpy_images):
+        print("Numpy array shape:", numpy_image.shape)
+        available_devices = get_available_devices_info()
+        device_info = available_devices[int(device_id)]
 
-    print("Step 1. Face Detector")
-    faces = step_1_face_detector(frame_image=numpy_image,
-                                 device_info=device_info,
-                                 detector_type=int(step_1_detector),
-                                 threshold=float(step_1_threshold),
-                                 fixed_window_size=int(step_1_window_size),
-                                 sort_by=int(step_1_sort_by),
-                                 max_faces=int(step_1_max_faces))
+        print("Step 1. Face Detector")
+        faces = step_1_face_detector(frame_image=numpy_image,
+                                     device_info=device_info,
+                                     detector_type=int(step_1_detector),
+                                     threshold=float(step_1_threshold),
+                                     fixed_window_size=int(step_1_window_size),
+                                     sort_by=int(step_1_sort_by),
+                                     max_faces=int(step_1_max_faces))
 
-    print("Step 2. Face Marker")
-    faces = step_2_face_marker(frame_image=numpy_image,
-                               faces=faces,
-                               device_info=device_info,
-                               marker_type=step_2_marker,
-                               marker_state_coverage=step_2_marker_coverage)
+        print("Step 2. Face Marker")
+        faces = step_2_face_marker(frame_image=numpy_image,
+                                   faces=faces,
+                                   device_info=device_info,
+                                   marker_type=step_2_marker,
+                                   marker_state_coverage=step_2_marker_coverage)
 
-    print("Step 3. Face Aligner")
-    faces = step_3_face_aligner(frame_image=numpy_image,
-                                faces=faces,
-                                align_mode=step_3_align_mode,
-                                head_mode=step_3_head_mode,
-                                freeze_z_rotation=step_3_freeze_z_rotation,
-                                resolution=step_3_resolution,
-                                face_coverage=step_3_face_coverage,
-                                x_offset=step_3_x_offset,
-                                y_offset=step_3_y_offset,
-                                exclude_moving_parts=step_3_exclude_moving_parts)
+        print("Step 3. Face Aligner")
+        faces = step_3_face_aligner(frame_image=numpy_image,
+                                    faces=faces,
+                                    align_mode=step_3_align_mode,
+                                    head_mode=step_3_head_mode,
+                                    freeze_z_rotation=step_3_freeze_z_rotation,
+                                    resolution=step_3_resolution,
+                                    face_coverage=step_3_face_coverage,
+                                    x_offset=step_3_x_offset,
+                                    y_offset=step_3_y_offset,
+                                    exclude_moving_parts=step_3_exclude_moving_parts)
+
+        faces_array.append(faces)
 
     # Note: There is a very weird issue with Step 4, when run through web ui, faces come out bluish and the issue is
     # not present when run through the command line. This is a workaround to fix the issue. The issue itself is in the
     # tensorflow library, and it is not present in the onnx version of the library.
 
     print("Step 4. Face Swapper")
-    faces = step_4_face_swapper_remote(faces=faces,
+    faces_array = step_4_face_swapper_remote(faces_array=faces_array,
                                 dfm_model=dfm_path,
                                 device_info=device_info,
                                 swap_all_faces=step_4_swap_all_faces,
@@ -528,25 +533,28 @@ def execute_deep_face_live( numpy_image,
     #     return fsi.face_swap_image_image
     #     return ImageProcessor(fsi.aligned_image).get_image('HWC')
 
-    print("Step 5. Face Merger")
-    return step_5_face_merger(frame_image=numpy_image,
-                              faces=faces,
-                              device_info=device_info,
-                              face_x_offset=int(step_5_x_offset),
-                              face_y_offset=int(step_5_y_offset),
-                              face_scale=int(step_5_face_scale),
-                              interpolation=str(step_5_interpolation),
-                              face_mask_source=bool(step_5_face_mask_src),
-                              face_mask_celeb=bool(step_5_face_celeb),
-                              face_mask_lmrks=bool(step_5_face_lmrks),
-                              face_mask_erode=int(step_5_face_mask_erode),
-                              face_mask_blur=int(step_5_face_mask_blur),
-                              color_transfer=str(step_5_color_transfer),
-                              face_opacity=int(step_5_face_opacity),
-                              color_compression=int(step_5_color_compression))
+    output_images = []
+    for image_id, faces in enumerate(faces_array):
+        print("Step 5. Face Merger")
+        output_images.append(step_5_face_merger(frame_image=numpy_images[image_id],
+                                  faces=faces,
+                                  device_info=device_info,
+                                  face_x_offset=int(step_5_x_offset),
+                                  face_y_offset=int(step_5_y_offset),
+                                  face_scale=int(step_5_face_scale),
+                                  interpolation=str(step_5_interpolation),
+                                  face_mask_source=bool(step_5_face_mask_src),
+                                  face_mask_celeb=bool(step_5_face_celeb),
+                                  face_mask_lmrks=bool(step_5_face_lmrks),
+                                  face_mask_erode=int(step_5_face_mask_erode),
+                                  face_mask_blur=int(step_5_face_mask_blur),
+                                  color_transfer=str(step_5_color_transfer),
+                                  face_opacity=int(step_5_face_opacity),
+                                  color_compression=int(step_5_color_compression)))
 
+    return output_images
 
-def step_4_face_swapper_remote(faces,
+def step_4_face_swapper_remote(faces_array,
                         dfm_model,
                         device_info,
                         swap_all_faces=True,
@@ -566,19 +574,22 @@ def step_4_face_swapper_remote(faces,
 
     faces_tmp_images = []
 
-    for face_iterration in enumerate(faces):
-        face_id = face_iterration[0]
-        fsi = face_iterration[1]
+    for image_id, faces in enumerate(faces_array):
+        face_iterration_images = []
+        for face_iterration in enumerate(faces):
+            face_id = face_iterration[0]
+            fsi = face_iterration[1]
 
-        # Create a temporary file to write the PNG image data to
-        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_file:
-            # Use the Pillow library to write the NumPy array to the temporary file as a PNG image
-            img = Image.fromarray(fsi.aligned_image)
-            img.save(tmp_file, "PNG")
+            # Create a temporary file to write the PNG image data to
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_file:
+                # Use the Pillow library to write the NumPy array to the temporary file as a PNG image
+                img = Image.fromarray(fsi.aligned_image)
+                img.save(tmp_file, "PNG")
 
-            # Get the filename of the temporary file
-            tmp_filename = tmp_file.name
-            faces_tmp_images.append(tmp_filename)
+                # Get the filename of the temporary file
+                tmp_filename = tmp_file.name
+                face_iterration_images.append(tmp_filename)
+        faces_tmp_images.append(face_iterration_images)
 
     faces_tmp_images_json = base64.b64encode(json.dumps(faces_tmp_images).encode("utf-8")).decode("utf-8")
     current_file = os.path.abspath(__file__)
@@ -596,16 +607,17 @@ def step_4_face_swapper_remote(faces,
         print("Output is not valid JSON")
         return
 
-    for face_id in enumerate(result):
-        print(face_id)
-        fsi = faces[face_id[0]]
-        swap_swap_image = cv2.imread(face_id[1][1])
-        swap_swap_image = cv2.cvtColor(swap_swap_image, cv2.COLOR_BGR2RGB)
-        fsi.face_swap_image_image = swap_swap_image
-        fsi.face_align_mask_image = np.array(cv2.imread(face_id[1][0]))
-        fsi.face_swap_mask_image = np.array(cv2.imread(face_id[1][2]))
+    for image_id, faces_output in enumerate(result):
+        for face_id in enumerate(faces_output):
+            print(face_id)
+            fsi = faces_array[image_id][face_id[0]]
+            swap_swap_image = cv2.imread(face_id[1][1])
+            swap_swap_image = cv2.cvtColor(swap_swap_image, cv2.COLOR_BGR2RGB)
+            fsi.face_swap_image_image = swap_swap_image
+            fsi.face_align_mask_image = np.array(cv2.imread(face_id[1][0]))
+            fsi.face_swap_mask_image = np.array(cv2.imread(face_id[1][2]))
 
-    return faces
+    return faces_array
 
 # Here is step 4 called through the remote function, which is called from the web UI
 if __name__ == '__main__':
@@ -633,42 +645,51 @@ if __name__ == '__main__':
         exit()
 
     faces_numpy = []
-    for face in faces_tmp_images:
-        # Load the image using OpenCV
-        image = cv2.imread(face)
+    for image_id, faces in enumerate(faces_tmp_images):
+        face_iterration_images = []
+        for face in faces:
+            # Load the image using OpenCV
+            image = cv2.imread(face)
 
-        # Convert the image to a numpy array
-        numpy_array = np.array(image)
-        faces_numpy.append(numpy_array)
+            # Convert the image to a numpy array
+            numpy_array = np.array(image)
+            face_iterration_images.append(numpy_array)
+        faces_numpy.append(face_iterration_images)
+
+    path = Path(dfm_model)
+    dfm_model = DFMModel(path, device_info)
 
     output = step_4_face_swapper(face_align_images=faces_numpy,
                                       dfm_model=dfm_model,
                                       device_info=device_info)
     output_files = []
-    for face in output:
-        # Create a temporary file to write the PNG image data to
-        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_file:
-            # Write the numpy array to an image file using OpenCV
-            cv2.imwrite(tmp_file.name, face[0])
+    for image_id, output_data in enumerate(output):
+        output_itteration = []
+        for face in output_data:
+            # Create a temporary file to write the PNG image data to
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_file:
+                # Write the numpy array to an image file using OpenCV
+                cv2.imwrite(tmp_file.name, face[0])
 
-            # Get the filename of the temporary file
-            face_align_mask_img = tmp_file.name
+                # Get the filename of the temporary file
+                face_align_mask_img = tmp_file.name
 
-        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_file2:
-            # Use the Pillow library to write the NumPy array to the temporary file as a PNG image
-            cv2.imwrite(tmp_file2.name, face[1])
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_file2:
+                # Use the Pillow library to write the NumPy array to the temporary file as a PNG image
+                cv2.imwrite(tmp_file2.name, face[1])
 
-            # Get the filename of the temporary file
-            celeb_face = tmp_file2.name
+                # Get the filename of the temporary file
+                celeb_face = tmp_file2.name
 
-        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_file3:
-            # Use the Pillow library to write the NumPy array to the temporary file as a PNG image
-            cv2.imwrite(tmp_file3.name, face[2])
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_file3:
+                # Use the Pillow library to write the NumPy array to the temporary file as a PNG image
+                cv2.imwrite(tmp_file3.name, face[2])
 
-            # Get the filename of the temporary file
-            celeb_face_mask_img = tmp_file3.name
+                # Get the filename of the temporary file
+                celeb_face_mask_img = tmp_file3.name
 
-        output_files.append([face_align_mask_img, celeb_face, celeb_face_mask_img])
+            output_itteration.append([face_align_mask_img, celeb_face, celeb_face_mask_img])
+        output_files.append(output_itteration)
 
     output_json = json.dumps(output_files)
     print(output_json)

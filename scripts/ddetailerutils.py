@@ -44,6 +44,8 @@ def list_models(model_path):
 class DetectionDetailerScript():
     def run(self,
             p,
+            model,
+            model_name,
             init_image,
             dd_conf_a = 30,
             dd_dilation_factor_a = 4,
@@ -51,17 +53,14 @@ class DetectionDetailerScript():
             dd_offset_y_a = 0):
 
         new_image = p
-        results_a = inference(init_image, "bbox/mmdet_anime-face_yolov3.pth", dd_conf_a / 100.0)
+        results_a = inference(init_image, model, model_name, dd_conf_a / 100.0)
         masks_a = create_segmasks(results_a)
         masks_a = dilate_masks(masks_a, dd_dilation_factor_a, 1)
         masks_a = offset_masks(masks_a, dd_offset_x_a, dd_offset_y_a)
         output_image = init_image
         gen_count = len(masks_a)
         if (gen_count > 0):
-            #results_a = update_result_masks(results_a, masks_a)
-            #segmask_preview_a = create_segmask_preview(results_a, init_image)
-            #shared.state.current_image = segmask_preview_a
-            state.job_count += gen_count
+            #state.job_count += gen_count
             new_image.init_images = [init_image]
             new_image.batch_size = 1
             new_image.n_iter = 1
@@ -92,38 +91,6 @@ def modeldataset(model_shortname):
 
 def modelpath(model_shortname):
     return dd_models_path + "/" + model_shortname
-
-def update_result_masks(results, masks):
-    for i in range(len(masks)):
-        boolmask = np.array(masks[i], dtype=bool)
-        results[1][i] = boolmask
-    return results
-
-def create_segmask_preview(results, image):
-    bboxes = results[0]
-    segms = results[1]
-
-    cv2_image = np.array(image)
-    cv2_image = cv2_image[:, :, ::-1].copy()
-
-    for i in range(len(segms)):
-        color = np.full_like(cv2_image, np.random.randint(100, 256, (1, 3), dtype=np.uint8))
-        alpha = 0.2
-        color_image = cv2.addWeighted(cv2_image, alpha, color, 1 - alpha, 0)
-        cv2_mask = segms[i].astype(np.uint8) * 255
-        cv2_mask_bool = np.array(segms[i], dtype=bool)
-        centroid = np.mean(np.argwhere(cv2_mask_bool), axis=0)
-        centroid_x, centroid_y = int(centroid[1]), int(centroid[0])
-
-        cv2_mask_rgb = cv2.merge((cv2_mask, cv2_mask, cv2_mask))
-        cv2_image = np.where(cv2_mask_rgb == 255, color_image, cv2_image)
-
-    if (len(segms) > 0):
-        preview_image = Image.fromarray(cv2.cvtColor(cv2_image, cv2.COLOR_BGR2RGB))
-    else:
-        preview_image = image
-
-    return preview_image
 
 def is_allblack(mask):
     cv2_mask = np.array(mask)
@@ -195,19 +162,21 @@ def get_device():
         cuda_device = "cpu"
     return cuda_device
 
-def inference(image, modelname, conf_thres):
+def inference(image, model, modelname, conf_thres):
     path = modelpath(modelname)
     if ("mmdet" in path and "bbox" in path):
-        results = inference_mmdet_bbox(image, modelname, conf_thres)
+        results = inference_mmdet_bbox(image, model, modelname, conf_thres)
     elif ("mmdet" in path and "segm" in path):
-        results = inference_mmdet_segm(image, modelname, conf_thres)
+        results = inference_mmdet_segm(image, model, modelname, conf_thres)
     return results
 
-def inference_mmdet_segm(image, modelname, conf_thres):
+def preload_ddetailer_model(modelname):
     model_checkpoint = modelpath(modelname)
     model_config = os.path.splitext(model_checkpoint)[0] + ".py"
     model_device = get_device()
-    model = init_detector(model_config, model_checkpoint, device=model_device)
+    return init_detector(model_config, model_checkpoint, device=model_device)
+
+def inference_mmdet_segm(image, model, modelname, conf_thres):
     mmdet_results = inference_detector(model, np.array(image))
     bbox_results, segm_results = mmdet_results
     dataset = modeldataset(modelname)
@@ -230,11 +199,7 @@ def inference_mmdet_segm(image, modelname, conf_thres):
 
     return results
 
-def inference_mmdet_bbox(image, modelname, conf_thres):
-    model_checkpoint = modelpath(modelname)
-    model_config = os.path.splitext(model_checkpoint)[0] + ".py"
-    model_device = get_device()
-    model = init_detector(model_config, model_checkpoint, device=model_device)
+def inference_mmdet_bbox(image, model, modelname, conf_thres):
     results = inference_detector(model, np.array(image))
     cv2_image = np.array(image)
     cv2_image = cv2_image[:, :, ::-1].copy()

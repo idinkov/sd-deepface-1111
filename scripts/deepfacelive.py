@@ -1,6 +1,11 @@
 import os
 import sys
-sys.path.append('repo/dflive/')
+
+# Get the absolute path of the directory containing the importing file
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Append the relative path to the importing file to the system path
+sys.path.append(os.path.join(current_dir, '../repo/dflive/'))
 
 import cv2
 from PIL import Image
@@ -16,9 +21,9 @@ from modules.sd_models import model_hash
 from modules.paths import models_path
 from basicsr.utils.download_util import load_file_from_url
 from modules.ui import create_refresh_button
-from scripts.ddetailerutils import DetectionDetailerScript
+from scripts.ddetailerutils import DetectionDetailerScript, preload_ddetailer_model
 
-from scripts.command import execute_deep_face_live
+from scripts.command import execute_deep_face_live_multiple
 dd_models_path = os.path.join(models_path, "mmdet")
 
 from scripts.dflutils import DflOptions, DflFiles
@@ -82,12 +87,10 @@ class DeepFaceLive(scripts.Script):
 
             with gr.Row():
                 image_return_original_checkbox = gr.Checkbox(label="Return original image")
-                save_training_data_checkbox = gr.Checkbox(label="Save faces for training")
-                only_training_images_checkbox = gr.Checkbox(label="Extract only training faces")
-            with gr.Row():
+                #save_training_data_checkbox = gr.Checkbox(label="Save faces for training")
+                #only_training_images_checkbox = gr.Checkbox(label="Extract only training faces")
                 enable_detection_detailer_face_checkbox = gr.Checkbox(label="Enable Detection Detailer for face", value=True)
-                save_detection_detailer_image_checkbox = gr.Checkbox(label="Save Detection Detailer Image")
-                use_cpu_checkbox = gr.Checkbox(label="Use CPU", value=True)
+                save_detection_detailer_image_checkbox = gr.Checkbox(label="Return Detection Detailer Image")
 
         with gr.Tab("Face Detector"):
             with gr.Row():
@@ -160,8 +163,6 @@ class DeepFaceLive(scripts.Script):
         return [info,
                 dfm_model_dropdown,
                 image_return_original_checkbox,
-                save_training_data_checkbox,
-                only_training_images_checkbox,
                 enable_detection_detailer_face_checkbox,
                 save_detection_detailer_image_checkbox,
                 step_1_detector_input,
@@ -202,49 +203,51 @@ class DeepFaceLive(scripts.Script):
                 step_5_color_compression_input,
                 step_5_face_opacity_input]
 
-    def process_frame(self, orig_image, dfm_model_dropdown,   step_1_detector_input,
-                                                              step_1_window_size_input,
-                                                              step_1_threshold_input,
-                                                              step_1_max_faces_input,
-                                                              step_1_sort_by_input,
-                                                              step_2_marker_input,
-                                                              step_2_marker_coverage_input,
-                                                              step_3_align_mode_input,
-                                                              step_3_face_coverage_input,
-                                                              step_3_resolution_input,
-                                                              step_3_exclude_moving_parts_input,
-                                                              step_3_head_mode_input,
-                                                              step_3_freeze_z_rotation_input,
-                                                              step_3_x_offset_input,
-                                                              step_3_y_offset_input,
-                                                              step_4_swap_all_faces_input,
-                                                              step_4_face_id_input,
-                                                              step_4_two_pass_input,
-                                                              step_4_pre_sharpen_input,
-                                                              step_4_pre_gamma_red_input,
-                                                              step_4_pre_gamma_green_input,
-                                                              step_4_pre_gamma_blue_input,
-                                                              step_4_post_gamma_red_input,
-                                                              step_4_post_gamma_green_input,
-                                                              step_4_post_gamma_blue_input,
-                                                              step_5_x_offset_input,
-                                                              step_5_y_offset_input,
-                                                              step_5_face_scale_input,
-                                                              step_5_face_mask_src_input,
-                                                              step_5_face_celeb_input,
-                                                              step_5_face_lmrks_input,
-                                                              step_5_face_mask_erode_input,
-                                                              step_5_face_mask_blur_input,
-                                                              step_5_color_transfer_input,
-                                                              step_5_interpolation_input,
-                                                              step_5_color_compression_input,
-                                                              step_5_face_opacity_input
+    def process_frames(self, images, dfm_model_dropdown, step_1_detector_input,
+                      step_1_window_size_input,
+                      step_1_threshold_input,
+                      step_1_max_faces_input,
+                      step_1_sort_by_input,
+                      step_2_marker_input,
+                      step_2_marker_coverage_input,
+                      step_3_align_mode_input,
+                      step_3_face_coverage_input,
+                      step_3_resolution_input,
+                      step_3_exclude_moving_parts_input,
+                      step_3_head_mode_input,
+                      step_3_freeze_z_rotation_input,
+                      step_3_x_offset_input,
+                      step_3_y_offset_input,
+                      step_4_swap_all_faces_input,
+                      step_4_face_id_input,
+                      step_4_two_pass_input,
+                      step_4_pre_sharpen_input,
+                      step_4_pre_gamma_red_input,
+                      step_4_pre_gamma_green_input,
+                      step_4_pre_gamma_blue_input,
+                      step_4_post_gamma_red_input,
+                      step_4_post_gamma_green_input,
+                      step_4_post_gamma_blue_input,
+                      step_5_x_offset_input,
+                      step_5_y_offset_input,
+                      step_5_face_scale_input,
+                      step_5_face_mask_src_input,
+                      step_5_face_celeb_input,
+                      step_5_face_lmrks_input,
+                      step_5_face_mask_erode_input,
+                      step_5_face_mask_blur_input,
+                      step_5_color_transfer_input,
+                      step_5_interpolation_input,
+                      step_5_color_compression_input,
+                      step_5_face_opacity_input
                       ):
 
         from scripts.command import DetectorType, FaceSortBy, MarkerType, AlignMode
-
         print("Processing " + dfm_model_dropdown)
-        img_array = np.array(orig_image)
+        img_array = []
+        for orig_image in images:
+            img_array.append(np.array(orig_image))
+
         dfm_path = str(Path(str(dfl_options.dfl_path) + "/" + str(dfm_model_dropdown)))
 
         step_1_detector = DetectorType.YOLOV5
@@ -281,7 +284,7 @@ class DeepFaceLive(scripts.Script):
         elif step_3_align_mode_input == "From static rect":
             step_3_align_mode = AlignMode.FROM_STATIC_RECT
 
-        img = execute_deep_face_live(numpy_image=img_array,
+        return execute_deep_face_live_multiple(numpy_images=img_array,
                                      dfm_path=dfm_path,
                                      device_id=0,
                                      step_1_detector=step_1_detector,
@@ -320,16 +323,31 @@ class DeepFaceLive(scripts.Script):
                                      step_5_color_transfer=step_5_color_transfer_input,
                                      step_5_interpolation=step_5_interpolation_input,
                                      step_5_color_compression=step_5_color_compression_input,
-                                     step_5_face_opacity=step_5_face_opacity_input
-                                     )
-        return img
+                                     step_5_face_opacity=step_5_face_opacity_input)
+
+    def generate_batches(self, final_images, batch_size):
+        """
+        Generate batches of data based on a given batch size.
+
+        Args:
+            final_images (list): List of images to be batched.
+            batch_size (int): The size of each batch.
+
+        Returns:
+            list: A list of batches, where each batch is a list of images.
+        """
+        num_batches = (len(final_images) + batch_size - 1) // batch_size
+        batches = []
+        for i in range(num_batches):
+            start = i * batch_size
+            end = min((i + 1) * batch_size, len(final_images))
+            batches.append(final_images[start:end])
+        return batches
 
     def run(self, p,
             info,
             dfm_model_dropdown,
             image_return_original_checkbox,
-            save_training_data_checkbox,
-            only_training_images_checkbox,
             enable_detection_detailer_face_checkbox,
             save_detection_detailer_image_checkbox,
             step_1_detector_input,
@@ -418,75 +436,92 @@ class DeepFaceLive(scripts.Script):
             p.do_not_save_samples = True
 
         output_images = []
+        factor_jobs = 0
+        if dfm_model_dropdown != "None":
+            factor_jobs += 1
+        if enable_detection_detailer_face_checkbox:
+            factor_jobs += 1
+        state.job_count = p_txt.n_iter + (p_txt.n_iter * p_txt.batch_size)*factor_jobs
         processed = processing.process_images(p_txt)
-        state.job_count = len(processed.images)
-        print(f"Itterations: {itterations}")
-        print(batch_size)
-        for current_image in processed.images:
+        #state.job_count += len(processed.images)*factor_jobs
+        final_images = []
+        images_count = len(processed.images)
+
+        if enable_detection_detailer_face_checkbox:
+            ddetailer_model = preload_ddetailer_model("bbox/mmdet_anime-face_yolov3.pth")
+
+        for image_n, current_image in enumerate(processed.images):
+            text_generation = f"Generation {(image_n+1)} out of {images_count}"
+            print(text_generation)
+            state.job = text_generation
             devices.torch_gc()
             if is_txt2img:
                 init_image = current_image
             else:
                 init_image = orig_image
 
-            if image_return_original_checkbox or only_training_images_checkbox or dfm_model_dropdown == "None":
+            if image_return_original_checkbox or dfm_model_dropdown == "None":
                 output_images.append(init_image)
-
-            print(f"Generation {p} out of {state.job_count}")
 
             if enable_detection_detailer_face_checkbox:
                 ddscript = DetectionDetailerScript()
-                init_image = ddscript.run(p=p, init_image=init_image)
+                last_no = state.job_no
+                init_image = ddscript.run(p=p, model=ddetailer_model, model_name="bbox/mmdet_anime-face_yolov3.pth", init_image=init_image)
+                if last_no == state.job_no:
+                    state.job_no += 1
                 if save_detection_detailer_image_checkbox:
                     output_images.append(init_image)
 
-            # Primary run
-            if dfm_model_dropdown != "None" and not only_training_images_checkbox:
-                output_images.append(self.process_frame(orig_image=init_image,
-                                                        dfm_model_dropdown=dfm_model_dropdown,
-                                                        step_1_detector_input=step_1_detector_input,
-                                                        step_1_window_size_input=step_1_window_size_input,
-                                                        step_1_threshold_input=step_1_threshold_input,
-                                                        step_1_max_faces_input=step_1_max_faces_input,
-                                                        step_1_sort_by_input=step_1_sort_by_input,
-                                                        step_2_marker_input=step_2_marker_input,
-                                                        step_2_marker_coverage_input=step_2_marker_coverage_input,
-                                                        step_3_align_mode_input=step_3_align_mode_input,
-                                                        step_3_face_coverage_input=step_3_face_coverage_input,
-                                                        step_3_resolution_input=step_3_resolution_input,
-                                                        step_3_exclude_moving_parts_input=step_3_exclude_moving_parts_input,
-                                                        step_3_head_mode_input=step_3_head_mode_input,
-                                                        step_3_freeze_z_rotation_input=step_3_freeze_z_rotation_input,
-                                                        step_3_x_offset_input=step_3_x_offset_input,
-                                                        step_3_y_offset_input=step_3_y_offset_input,
-                                                        step_4_swap_all_faces_input=step_4_swap_all_faces_input,
-                                                        step_4_face_id_input=step_4_face_id_input,
-                                                        step_4_two_pass_input=step_4_two_pass_input,
-                                                        step_4_pre_sharpen_input=step_4_pre_sharpen_input,
-                                                        step_4_pre_gamma_red_input=step_4_pre_gamma_red_input,
-                                                        step_4_pre_gamma_green_input=step_4_pre_gamma_green_input,
-                                                        step_4_pre_gamma_blue_input=step_4_pre_gamma_blue_input,
-                                                        step_4_post_gamma_red_input=step_4_post_gamma_red_input,
-                                                        step_4_post_gamma_green_input=step_4_post_gamma_green_input,
-                                                        step_4_post_gamma_blue_input=step_4_post_gamma_blue_input,
-                                                        step_5_x_offset_input=step_5_x_offset_input,
-                                                        step_5_y_offset_input=step_5_y_offset_input,
-                                                        step_5_face_scale_input=step_5_face_scale_input,
-                                                        step_5_face_mask_src_input=step_5_face_mask_src_input,
-                                                        step_5_face_celeb_input=step_5_face_celeb_input,
-                                                        step_5_face_lmrks_input=step_5_face_lmrks_input,
-                                                        step_5_face_mask_erode_input=step_5_face_mask_erode_input,
-                                                        step_5_face_mask_blur_input=step_5_face_mask_blur_input,
-                                                        step_5_color_transfer_input=step_5_color_transfer_input,
-                                                        step_5_interpolation_input=step_5_interpolation_input,
-                                                        step_5_color_compression_input=step_5_color_compression_input,
-                                                        step_5_face_opacity_input=step_5_face_opacity_input
-                                                        ))
+            final_images.append(init_image)
 
-        if (initial_info is None):
-            initial_info = ""
+        batches = self.generate_batches(final_images, 40)
+        for batch in batches:
+            if dfm_model_dropdown != "None":
+                output_images_itteration = self.process_frames(images=batch,
+                                    dfm_model_dropdown=dfm_model_dropdown,
+                                    step_1_detector_input=step_1_detector_input,
+                                    step_1_window_size_input=step_1_window_size_input,
+                                    step_1_threshold_input=step_1_threshold_input,
+                                    step_1_max_faces_input=step_1_max_faces_input,
+                                    step_1_sort_by_input=step_1_sort_by_input,
+                                    step_2_marker_input=step_2_marker_input,
+                                    step_2_marker_coverage_input=step_2_marker_coverage_input,
+                                    step_3_align_mode_input=step_3_align_mode_input,
+                                    step_3_face_coverage_input=step_3_face_coverage_input,
+                                    step_3_resolution_input=step_3_resolution_input,
+                                    step_3_exclude_moving_parts_input=step_3_exclude_moving_parts_input,
+                                    step_3_head_mode_input=step_3_head_mode_input,
+                                    step_3_freeze_z_rotation_input=step_3_freeze_z_rotation_input,
+                                    step_3_x_offset_input=step_3_x_offset_input,
+                                    step_3_y_offset_input=step_3_y_offset_input,
+                                    step_4_swap_all_faces_input=step_4_swap_all_faces_input,
+                                    step_4_face_id_input=step_4_face_id_input,
+                                    step_4_two_pass_input=step_4_two_pass_input,
+                                    step_4_pre_sharpen_input=step_4_pre_sharpen_input,
+                                    step_4_pre_gamma_red_input=step_4_pre_gamma_red_input,
+                                    step_4_pre_gamma_green_input=step_4_pre_gamma_green_input,
+                                    step_4_pre_gamma_blue_input=step_4_pre_gamma_blue_input,
+                                    step_4_post_gamma_red_input=step_4_post_gamma_red_input,
+                                    step_4_post_gamma_green_input=step_4_post_gamma_green_input,
+                                    step_4_post_gamma_blue_input=step_4_post_gamma_blue_input,
+                                    step_5_x_offset_input=step_5_x_offset_input,
+                                    step_5_y_offset_input=step_5_y_offset_input,
+                                    step_5_face_scale_input=step_5_face_scale_input,
+                                    step_5_face_mask_src_input=step_5_face_mask_src_input,
+                                    step_5_face_celeb_input=step_5_face_celeb_input,
+                                    step_5_face_lmrks_input=step_5_face_lmrks_input,
+                                    step_5_face_mask_erode_input=step_5_face_mask_erode_input,
+                                    step_5_face_mask_blur_input=step_5_face_mask_blur_input,
+                                    step_5_color_transfer_input=step_5_color_transfer_input,
+                                    step_5_interpolation_input=step_5_interpolation_input,
+                                    step_5_color_compression_input=step_5_color_compression_input,
+                                    step_5_face_opacity_input=step_5_face_opacity_input)
 
-        return Processed(p, output_images, seed, initial_info)
+                for output_image in output_images_itteration:
+                    output_images.append(output_image)
+                    state.job_no += 1
+
+        return Processed(p, output_images, seed, "")
 
 
 
