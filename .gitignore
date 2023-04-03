@@ -2,3 +2,5 @@
 /repo/dflab/
 /notebooks/
 __pycache__
+.idea
+.ipynb_checkpoints
