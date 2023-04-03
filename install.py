@@ -51,7 +51,7 @@ if not launch.is_installed("onnxruntime"):
 # if not launch.is_installed("protobuf"):
 launch.run_pip("install protobuf==3.20", "requirements for DeepFaceLab - protobuf==3.20")
 
-script_path = Path(paths.script_path) / "extensions/deepfacelab/repo/"
+script_path = Path(os.path.dirname(os.path.abspath(__file__))) / "repo/"
 dflab_path = str(script_path / "dflab")
 dflive_path = str(script_path / "dflive")
 
