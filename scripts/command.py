@@ -508,7 +508,7 @@ def execute_deep_face_live_multiple( numpy_images,
     print("Step 4. Face Swapper")
     faces_array = step_4_face_swapper_remote(faces_array=faces_array,
                                 dfm_model=dfm_path,
-                                device_info=device_info,
+                                device_id=device_id,
                                 swap_all_faces=step_4_swap_all_faces,
                                 selected_face_id=int(step_4_face_id),
                                 pre_gamma=[step_4_pre_gamma_red, step_4_pre_gamma_green, step_4_pre_gamma_blue],
@@ -556,7 +556,7 @@ def execute_deep_face_live_multiple( numpy_images,
 
 def step_4_face_swapper_remote(faces_array,
                         dfm_model,
-                        device_info,
+                        device_id,
                         swap_all_faces=True,
                         selected_face_id=1,
                         pre_gamma=[1,1,1],
@@ -594,7 +594,16 @@ def step_4_face_swapper_remote(faces_array,
     faces_tmp_images_json = base64.b64encode(json.dumps(faces_tmp_images).encode("utf-8")).decode("utf-8")
     current_file = os.path.abspath(__file__)
 
-    python_call = ['python', current_file, faces_tmp_images_json, dfm_model]
+    python_call = ['python',
+                   current_file,
+                   faces_tmp_images_json,
+                   dfm_model,
+                   str(device_id),
+                   str(swap_all_faces),
+                   str(selected_face_id),
+                   str(presharpen_amount),
+                   str(two_pass)]
+
     print("Calling: " + " ".join(str(x) for x in python_call))
 
     result = subprocess.run(python_call, capture_output=True, text=True)
@@ -630,7 +639,12 @@ if __name__ == '__main__':
     # Get the image file path and DFL path from command line arguments
     faces_tmp_images_json = sys.argv[1]
     dfm_model = sys.argv[2]
-    device_id = 0
+    device_id = int(sys.argv[3])
+    swap_all_faces = bool(sys.argv[4])
+    selected_face_id = int(sys.argv[5])
+    presharpen_amount = float(sys.argv[6])
+    two_pass = bool(sys.argv[7])
+
     available_devices = get_available_devices_info()
     device_info = available_devices[int(device_id)]
     try:
@@ -661,7 +675,11 @@ if __name__ == '__main__':
 
     output = step_4_face_swapper(face_align_images=faces_numpy,
                                       dfm_model=dfm_model,
-                                      device_info=device_info)
+                                      device_info=device_info,
+                                      swap_all_faces=swap_all_faces,
+                                      selected_face_id=selected_face_id,
+                                      presharpen_amount=presharpen_amount,
+                                      two_pass=two_pass)
     output_files = []
     for image_id, output_data in enumerate(output):
         output_itteration = []
