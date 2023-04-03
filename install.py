@@ -48,8 +48,8 @@ if not launch.is_installed("tf2onnx"):
 if not launch.is_installed("onnxruntime"):
     launch.run_pip("install onnxruntime", "requirements for DeepFaceLab - onnxruntime")
 
-# if not launch.is_installed("protobuf"):
-launch.run_pip("install protobuf==3.20", "requirements for DeepFaceLab - protobuf==3.20")
+if not launch.is_installed("protobuf") or launch.get_package_version("protobuf") != '3.20.3':
+    launch.run_pip("install protobuf==3.20.3", "requirements for DeepFaceLab - protobuf==3.20")
 
 script_path = Path(os.path.dirname(os.path.abspath(__file__))) / "repo/"
 dflab_path = str(script_path / "dflab")

@@ -96,7 +96,7 @@ class DeepFaceLive(scripts.Script):
             with gr.Row():
                 step_1_detector_input = gr.Dropdown(label="Detector", choices=list_detectors(), value="YoloV5", visible=True, type="value")
                 step_1_window_size_input = gr.Dropdown(label="Window size", choices=["Auto", "512", "320", "160"], value="Auto", type="value")
-                step_1_threshold_input = gr.Number(label="Threshold", min_value=0, max_value=100, step=1, value=50)
+                step_1_threshold_input = gr.Number(label="Threshold", min_value=0, max_value=1, step=1, value=0.5)
             with gr.Row():
                 step_1_max_faces_input = gr.Number(label="Max Faces", min_value=1, max_value=None, value=3)
                 step_1_sort_by_input = gr.Dropdown(label="Sort By", choices=["Largest", "Dist from center", "From left to right", "From top to bottom", "From bottom to top"], value="Largest")

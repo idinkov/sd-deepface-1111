@@ -133,7 +133,7 @@ class DflFiles:
 class DflOptions:
     def __init__(self, opts):
         dfl_path = Path(paths.script_path) / "deepfacelab"
-        scripts_path = Path(paths.script_path) / "extensions" / "deepfacelab"
+        scripts_path = Path(os.path.dirname(os.path.abspath(__file__))) / "../"
         print("Scripts path:" + str(scripts_path))
 
         self.dfl_path = Path(str(dfl_path / "dfl-files"))
