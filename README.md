@@ -28,7 +28,6 @@ In order to implement DeepFaceLab which at the moment of writing uses Python 3.6
 
 ## TODO
 - Implement DeepFaceLab.
-- Implement GPU support, it now works on CPU
 
 ## References
 
