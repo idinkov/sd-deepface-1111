@@ -409,7 +409,7 @@ def step_5_face_merger(frame_image,
                                                                                    frame_width, frame_height)
 
                 do_color_compression = fsi_id == fsi_list_len - 1
-                if str(device_info) == 'CPU':
+                if str(device_info) == 'CPU' or True:
                     merged_frame = step_5_merge_on_cpu(merged_frame, face_resolution, face_align_img,
                                                       face_align_mask_img, face_align_lmrks_mask_img, face_swap_img,
                                                       face_swap_mask_img, aligned_to_source_uni_mat, frame_width,
@@ -648,10 +648,9 @@ if __name__ == '__main__':
     available_devices = get_available_devices_info()
     device_info = available_devices[int(device_id)]
     try:
-        # Encode the output as a JSON-encoded string
+        # Decode the output to array
         decoded_string = base64.b64decode(faces_tmp_images_json).decode("utf-8")
         faces_tmp_images = json.loads(decoded_string)
-        # Print the output to stdout
     except json.JSONDecodeError:
         error_dict = {"error": "faces_tmp_images_json is not readable. Invalid JSON."}
         error_json = json.dumps(error_dict)

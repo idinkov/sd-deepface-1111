@@ -154,12 +154,6 @@ class DeepFaceLive(scripts.Script):
                 #step_5_interpolation_input = gr.Dropdown(label="Interpolation", choices=["bilinear", "bicubic", "lanczos4"], value="bilinear", visible=True, type="value")
                 step_5_interpolation_input = gr.Dropdown(label="Interpolation", choices=["bilinear"], value="bilinear", visible=True, type="value")
 
-        with gr.Group():
-            with gr.Row():
-                info = gr.HTML("<p style=\"padding-left: 5px;\">Note: If the output results are not a good quality you can fine tune them "
-                               "by using the <b>Save images for training</b> checkbox to collect input training images to further "
-                               "train the DFM model you have in the DeepFaceLab tab.</p>")
-
         return [info,
                 dfm_model_dropdown,
                 image_return_original_checkbox,
@@ -435,13 +429,16 @@ class DeepFaceLive(scripts.Script):
             p.do_not_save_grid = True
             p.do_not_save_samples = True
 
+        import math
         output_images = []
         factor_jobs = 0
+        add_job_count = 0
+        batch_size_dfl = 40
         if dfm_model_dropdown != "None":
-            factor_jobs += 1
+            add_job_count = math.ceil((p_txt.n_iter * p_txt.batch_size)/batch_size_dfl)
         if enable_detection_detailer_face_checkbox:
             factor_jobs += 1
-        state.job_count = p_txt.n_iter + (p_txt.n_iter * p_txt.batch_size)*factor_jobs
+        state.job_count = p_txt.n_iter + (p_txt.n_iter * p_txt.batch_size)*factor_jobs + add_job_count
         processed = processing.process_images(p_txt)
         #state.job_count += len(processed.images)*factor_jobs
         final_images = []
@@ -474,7 +471,7 @@ class DeepFaceLive(scripts.Script):
 
             final_images.append(init_image)
 
-        batches = self.generate_batches(final_images, 40)
+        batches = self.generate_batches(final_images, batch_size_dfl)
         for batch in batches:
             if dfm_model_dropdown != "None":
                 output_images_itteration = self.process_frames(images=batch,
@@ -519,7 +516,8 @@ class DeepFaceLive(scripts.Script):
 
                 for output_image in output_images_itteration:
                     output_images.append(output_image)
-                    state.job_no += 1
+
+                state.job_no += 1
 
         return Processed(p, output_images, seed, "")
 

@@ -45,11 +45,16 @@ if not launch.is_installed("pyqt5"):
 if not launch.is_installed("tf2onnx"):
     launch.run_pip("install tf2onnx", "requirements for DeepFaceLab - tf2onnx")
 
-if not launch.is_installed("onnxruntime"):
-    launch.run_pip("install onnxruntime", "requirements for DeepFaceLab - onnxruntime")
+# Cpu Only Version
+# if not launch.is_installed("onnxruntime"):
+#     launch.run_pip("install onnxruntime", "requirements for DeepFaceLab - onnxruntime")
+
+# Gpu Version
+if not launch.is_installed("onnxruntime-gpu") or launch.get_package_version("onnxruntime-gpu") != '1.12.1':
+    launch.run_pip("install onnxruntime-gpu==1.12.1", "requirements for DeepFaceLive - onnxruntime-gpu==1.12.1")
 
 if not launch.is_installed("protobuf") or launch.get_package_version("protobuf") != '3.20.3':
-    launch.run_pip("install protobuf==3.20.3", "requirements for DeepFaceLab - protobuf==3.20")
+    launch.run_pip("install protobuf==3.20.3", "requirements for DeepFaceLive - protobuf==3.20.3")
 
 script_path = Path(os.path.dirname(os.path.abspath(__file__))) / "repo/"
 dflab_path = str(script_path / "dflab")
