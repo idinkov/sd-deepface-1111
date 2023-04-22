@@ -48,12 +48,15 @@ class DflFiles:
         os.replace(src, dst)
 
     @staticmethod
-    def get_files_from_dir(base_dir, extension_list):
+    def get_files_from_dir(base_dir, extension_list, two_dimensions=False):
         """Return a list of file names in a directory with a matching file extension"""
         files = []
         for v in Path(base_dir).iterdir():
             if v.suffix in extension_list and not v.name.startswith('.ipynb'):
-                files.append(v.name)
+                if two_dimensions:
+                    files.append([v.name, v.name])
+                else:
+                    files.append(v.name)
         return files
 
     @staticmethod
@@ -216,8 +219,20 @@ class DflOptions:
 
     # Lists start here
 
-    def get_dfl_list(self):
-        return DflFiles.get_files_from_dir(self.dfl_path, [".dfm"])
+    def get_dfl_list(self, include_downloadable=True):
+        dir_files = DflFiles.get_files_from_dir(self.dfl_path, [".dfm"], True)
+        dir_files_one = DflFiles.get_files_from_dir(self.dfl_path, [".dfm"])
+        if include_downloadable:
+            downloable_files = self.get_downloadable_models(dir_files_one)
+            tmp_files = []
+            for f in downloable_files:
+                tmp_files.append([f[0] + " (To Download)", f[1]])
+            return dir_files + tmp_files
+        return dir_files
+
+    def get_downloadable_models(self, available_models):
+        from scripts.command import get_downloadable_models
+        return get_downloadable_models(self.dfl_path, available_models)
 
     def get_pak_list(self):
         return DflFiles.get_files_from_dir(self.pak_path, [".pak"])

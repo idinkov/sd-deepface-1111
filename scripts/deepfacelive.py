@@ -29,8 +29,32 @@ dd_models_path = os.path.join(models_path, "mmdet")
 from scripts.dflutils import DflOptions, DflFiles
 dfl_options = DflOptions(opts)
 
-def list_models():
-    return dfl_options.get_dfl_list()
+def list_models(include_downloadable=True):
+    dfl_dropdown = []
+    dfl_list = dfl_options.get_dfl_list(include_downloadable)
+    for dfl in dfl_list:
+        dfl_dropdown.append(dfl[0])
+    return dfl_dropdown
+
+def download_url(url, filename):
+    load_file_from_url(url, filename)
+
+from urllib.parse import urlparse
+
+def is_url(string):
+    try:
+        result = urlparse(string)
+        # Check if the URL has a scheme (e.g., http or https) and a network location (e.g., www.example.com)
+        return all([result.scheme, result.netloc])
+    except ValueError:
+        return False
+
+def get_model_url(model_name):
+    dfl_list = dfl_options.get_dfl_list(True)
+    for dfl in dfl_list:
+        if dfl[0] == model_name and is_url(dfl[1]):
+            return dfl[1]
+    return None
 
 def list_detectors():
     return ['CenterFace', 'S3FD', 'YoloV5']
@@ -72,90 +96,88 @@ class DeepFaceLive(scripts.Script):
     def ui(self, is_img2img):
         import modules.ui
 
-        if is_img2img:
-            info = gr.HTML("<p style=\"\"></p>")
-        else:
-            info = gr.HTML("")
+        gr.HTML("")
         with gr.Group():
             with gr.Row():
-                dfm_model_dropdown = gr.Dropdown(label="DFM Model", choices=list_models(), value="None", visible=True, type="value")
-                #dfm_model_dropdown_include_downloadable = gr.Checkbox(label="Include downloadable")
-                create_refresh_button(dfm_model_dropdown, lambda: None, lambda: {"choices": list_models()}, "refresh_dfm_model_list")
+                gr.HTML("<p style=\"padding-left: 5px;\">You can put the models into <b>" + str(dfl_options.dfl_path) + "</b></p><br />")
             with gr.Row():
-                info_upload = gr.HTML(
-                    "<p style=\"padding-left: 5px;\">You can put the models into <b>" + str(dfl_options.dfl_path) + "</b> Change the folder in the Settings</p>")
+                dfm_model_dropdown = gr.Dropdown(label="DFM Model", choices=list_models(True), value="None", visible=True, type="value")
+                create_refresh_button(dfm_model_dropdown, lambda: None, lambda: {"choices": list_models(True)}, "refresh_dfm_model_list")
 
             with gr.Row():
                 image_return_original_checkbox = gr.Checkbox(label="Return original image")
-                #save_training_data_checkbox = gr.Checkbox(label="Save faces for training")
-                #only_training_images_checkbox = gr.Checkbox(label="Extract only training faces")
                 enable_detection_detailer_face_checkbox = gr.Checkbox(label="Enable Detection Detailer for face", value=True)
                 save_detection_detailer_image_checkbox = gr.Checkbox(label="Return Detection Detailer Image")
 
-        with gr.Tab("Face Detector"):
-            with gr.Row():
-                step_1_detector_input = gr.Dropdown(label="Detector", choices=list_detectors(), value="YoloV5", visible=True, type="value")
-                step_1_window_size_input = gr.Dropdown(label="Window size", choices=["Auto", "512", "320", "160"], value="Auto", type="value")
-                step_1_threshold_input = gr.Number(label="Threshold", min_value=0, max_value=1, step=1, value=0.5)
-            with gr.Row():
-                step_1_max_faces_input = gr.Number(label="Max Faces", min_value=1, max_value=None, value=3)
-                step_1_sort_by_input = gr.Dropdown(label="Sort By", choices=["Largest", "Dist from center", "From left to right", "From top to bottom", "From bottom to top"], value="Largest")
+        with gr.Group(elem_id="dfl_settings"):
+            with gr.Tab("Face Detector"):
+                gr.HTML("<br />")
+                with gr.Row():
+                    step_1_detector_input = gr.Dropdown(label="Detector", choices=list_detectors(), value="YoloV5", visible=True, type="value")
+                    step_1_window_size_input = gr.Dropdown(label="Window size", choices=["Auto", "512", "320", "160"], value="Auto", type="value")
+                    step_1_threshold_input = gr.Slider(minimum=0.0, maximum=1.0, step=0.1, label="Threshold ", value=0.5)
+                with gr.Row():
+                    step_1_max_faces_input = gr.Number(label="Max Faces", min_value=1, max_value=None, value=3)
+                    step_1_sort_by_input = gr.Dropdown(label="Sort By", choices=["Largest", "Dist from center", "From left to right", "From top to bottom", "From bottom to top"], value="Largest")
 
-        with gr.Tab("Face Marker"):
-            with gr.Row():
-                step_2_marker_input = gr.Dropdown(label="Marker", choices=list_markers(), value="InsightFace_2D106", visible=True, type="value")
-                step_2_marker_coverage_input = gr.Number(label="Marker coverage", min_value=0, max_value=3, step=0.1, value=1.6)
+            with gr.Tab("Marker"):
+                gr.HTML("<br />")
+                with gr.Row():
+                    step_2_marker_input = gr.Dropdown(label="Marker", choices=list_markers(), value="InsightFace_2D106", visible=True, type="value")
+                    step_2_marker_coverage_input = gr.Slider(minimum=0.0, maximum=3.0, step=0.1, label="Marker coverage", value=1.6)
 
-        with gr.Tab("Face Aligner"):
-            with gr.Row():
-                step_3_align_mode_input = gr.Dropdown(label="Align mode", choices=list_align_modes(), value="From points", visible=True, type="value")
-                step_3_face_coverage_input = gr.Number(label="Face coverage", min_value=0, max_value=3, step=0.1, value=2.2)
-                step_3_resolution_input = gr.Number(label="Resolution", min_value=16, max_value=1024, step=16, value=320)
-            with gr.Row():
-                step_3_exclude_moving_parts_input = gr.Checkbox(label="Exclude moving parts", value=True)
-                step_3_head_mode_input = gr.Checkbox(label="Head mode", value=False)
-                step_3_freeze_z_rotation_input = gr.Checkbox(label="Freeze Z rotation", value=False)
-            with gr.Row():
-                step_3_x_offset_input = gr.Number(label="X offset", min_value=0, max_value=200, step=0.1, value=0)
-                step_3_y_offset_input = gr.Number(label="Y offset", min_value=0, max_value=200, step=0.1, value=0)
+            with gr.Tab("Aligner"):
+                gr.HTML("<br />")
+                with gr.Row():
+                    step_3_align_mode_input = gr.Dropdown(label="Align mode", choices=list_align_modes(), value="From points", visible=True, type="value")
+                    step_3_face_coverage_input = gr.Slider(label="Face coverage ", minimum=0.0, maximum=3.0, step=0.1, value=2.2)
+                    step_3_resolution_input = gr.Slider(label="Resolution ", minimum=16, maximum=640, step=16, value=320)
+                with gr.Row():
+                    step_3_exclude_moving_parts_input = gr.Checkbox(label="Exclude moving parts", value=True)
+                    step_3_head_mode_input = gr.Checkbox(label="Head mode", value=False)
+                    step_3_freeze_z_rotation_input = gr.Checkbox(label="Freeze Z rotation", value=False)
+                with gr.Row():
+                    step_3_x_offset_input = gr.Number(label="X offset", min_value=0, max_value=200, step=0.1, value=0)
+                    step_3_y_offset_input = gr.Number(label="Y offset", min_value=0, max_value=200, step=0.1, value=0)
 
-        with gr.Tab("Face Swapper"):
-            with gr.Row():
-                step_4_swap_all_faces_input = gr.Checkbox(label="Swap all faces", value=True)
-                step_4_face_id_input = gr.Number(label="Face ID", min_value=0, max_value=24, step=1, value=0)
-                step_4_two_pass_input = gr.Checkbox(label="Two Pass", value=False)
-                step_4_pre_sharpen_input = gr.Number(label="Pre-sharpen", min_value=0, max_value=100, step=1, value=0.5)
-            with gr.Row():
-                step_4_pre_gamma_red_input = gr.Number(label="Pre-gamma Red", min_value=1, max_value=100, step=1, value=1)
-                step_4_pre_gamma_green_input = gr.Number(label="Pre-gamma Green", min_value=1, max_value=100, step=1, value=1)
-                step_4_pre_gamma_blue_input = gr.Number(label="Pre-gamma Blue", min_value=1, max_value=100, step=1, value=1)
-            with gr.Row():
-                step_4_post_gamma_red_input = gr.Number(label="Post-gamma Red", min_value=1, max_value=100, step=1, value=1)
-                step_4_post_gamma_green_input = gr.Number(label="Post-gamma Green", min_value=1, max_value=100, step=1, value=1)
-                step_4_post_gamma_blue_input = gr.Number(label="Post-gamma Blue", min_value=1, max_value=100, step=1, value=1)
+            with gr.Tab("Swapper"):
+                gr.HTML("<br />")
+                with gr.Row():
+                    step_4_swap_all_faces_input = gr.Checkbox(label="Swap all faces", value=True)
+                    step_4_face_id_input = gr.Number(label="Face ID", min_value=0, max_value=24, step=1, value=0)
+                    step_4_two_pass_input = gr.Checkbox(label="Two Pass", value=False)
+                    step_4_pre_sharpen_input = gr.Slider(label="Pre-sharpen ", minimum=0.0, maximum=8.0, step=0.1, value=4.0)
+                with gr.Row():
+                    step_4_pre_gamma_red_input = gr.Number(label="Pre-gamma Red", min_value=1, max_value=100, step=1, value=1)
+                    step_4_pre_gamma_green_input = gr.Number(label="Pre-gamma Green", min_value=1, max_value=100, step=1, value=1)
+                    step_4_pre_gamma_blue_input = gr.Number(label="Pre-gamma Blue", min_value=1, max_value=100, step=1, value=1)
+                with gr.Row():
+                    step_4_post_gamma_red_input = gr.Number(label="Post-gamma Red", min_value=1, max_value=100, step=1, value=1)
+                    step_4_post_gamma_green_input = gr.Number(label="Post-gamma Green", min_value=1, max_value=100, step=1, value=1)
+                    step_4_post_gamma_blue_input = gr.Number(label="Post-gamma Blue", min_value=1, max_value=100, step=1, value=1)
 
 
-        with gr.Tab("Face Merger"):
-            with gr.Row():
-                step_5_x_offset_input = gr.Number(label="Face X offset", min_value=0, max_value=10, step=1, value=0)
-                step_5_y_offset_input = gr.Number(label="Face Y offset", min_value=0, max_value=10, step=1, value=0)
-                step_5_face_scale_input = gr.Number(label="Face scale", min_value=0, max_value=10, step=1, value=1)
-            with gr.Row():
-                step_5_face_mask_src_input = gr.Checkbox(label="Face mask (SRC)", value=True)
-                step_5_face_celeb_input = gr.Checkbox(label="Face mask (CELEB)", value=True)
-                step_5_face_lmrks_input = gr.Checkbox(label="Face mask (LMRKS)", value=False)
-            with gr.Row():
-                step_5_face_mask_erode_input = gr.Number(label="Face mask erode", min_value=0, max_value=100, step=1, value=5)
-                step_5_face_mask_blur_input = gr.Number(label="Face mask blur", min_value=0, max_value=100, step=1, value=25)
-                step_5_color_transfer_input = gr.Dropdown(label="Color transfer", choices=["none", "rct"], value="rct", visible=True, type="value")
-            with gr.Row():
-                step_5_color_compression_input = gr.Number(label="Color compression", min_value=0, max_value=100, step=1, value=0)
-                step_5_face_opacity_input = gr.Number(label="Face opacity", min_value=0, max_value=1, step=1, value=1)
-                #step_5_interpolation_input = gr.Dropdown(label="Interpolation", choices=["bilinear", "bicubic", "lanczos4"], value="bilinear", visible=True, type="value")
-                step_5_interpolation_input = gr.Dropdown(label="Interpolation", choices=["bilinear"], value="bilinear", visible=True, type="value")
+            with gr.Tab("Merger"):
+                gr.HTML("<br />")
+                with gr.Row():
+                    step_5_x_offset_input = gr.Slider(label="Face X offset ", minimum=0, maximum=10, step=1, value=0)
+                    step_5_y_offset_input = gr.Slider(label="Face Y offset ", minimum=0, maximum=10, step=1, value=0)
+                    step_5_face_scale_input = gr.Slider(label="Face scale ", minimum=0.0, maximum=2.0, step=0.1, value=1.0)
+                with gr.Row():
+                    step_5_face_mask_src_input = gr.Checkbox(label="Face mask (SRC)", value=True)
+                    step_5_face_celeb_input = gr.Checkbox(label="Face mask (CELEB)", value=True)
+                    step_5_face_lmrks_input = gr.Checkbox(label="Face mask (LMRKS)", value=False)
+                with gr.Row():
+                    step_5_face_mask_erode_input = gr.Number(label="Face mask erode", min_value=0, max_value=100, step=1, value=5)
+                    step_5_face_mask_blur_input = gr.Number(label="Face mask blur", min_value=0, max_value=100, step=1, value=25)
+                    step_5_color_transfer_input = gr.Dropdown(label="Color transfer", choices=["none", "rct"], value="rct", visible=True, type="value")
+                with gr.Row():
+                    step_5_color_compression_input = gr.Slider(label="Color compression ", minimum=0, maximum=100, step=1, value=0)
+                    step_5_face_opacity_input = gr.Slider(label="Face opacity ", minimum=0.00, maximum=1.00, step=0.01, value=1.00)
+                    #step_5_interpolation_input = gr.Dropdown(label="Interpolation", choices=["bilinear", "bicubic", "lanczos4"], value="bilinear", visible=True, type="value")
+                    step_5_interpolation_input = gr.Dropdown(label="Interpolation", choices=["bilinear"], value="bilinear", visible=True, type="value")
 
-        return [info,
-                dfm_model_dropdown,
+        return [dfm_model_dropdown,
                 image_return_original_checkbox,
                 enable_detection_detailer_face_checkbox,
                 save_detection_detailer_image_checkbox,
@@ -264,7 +286,7 @@ class DeepFaceLive(scripts.Script):
         if step_1_window_size == "Auto":
             step_1_window_size = 0
 
-        step_1_threshold = step_1_threshold_input
+        step_1_threshold = str(step_1_threshold_input)
 
         step_2_marker = MarkerType.INSIGHT_2D106
         if step_2_marker_input == "OpenCV LBF":
@@ -339,7 +361,6 @@ class DeepFaceLive(scripts.Script):
         return batches
 
     def run(self, p,
-            info,
             dfm_model_dropdown,
             image_return_original_checkbox,
             enable_detection_detailer_face_checkbox,
@@ -383,11 +404,7 @@ class DeepFaceLive(scripts.Script):
             step_5_face_opacity_input
             ):
         processing.fix_seed(p)
-        initial_info = None
         seed = p.seed
-        batch_size = p.batch_size
-        itterations = p.n_iter
-        #p.n_iter = 1
         p.do_not_save_grid = True
         p.do_not_save_samples = True
         is_txt2img = isinstance(p, StableDiffusionProcessingTxt2Img)
@@ -435,17 +452,29 @@ class DeepFaceLive(scripts.Script):
         add_job_count = 0
         batch_size_dfl = 40
         if dfm_model_dropdown != "None":
+            if get_model_url(dfm_model_dropdown) is not None:
+                add_job_count += 1
             add_job_count = math.ceil((p_txt.n_iter * p_txt.batch_size)/batch_size_dfl)
         if enable_detection_detailer_face_checkbox:
             factor_jobs += 1
         state.job_count = p_txt.n_iter + (p_txt.n_iter * p_txt.batch_size)*factor_jobs + add_job_count
         processed = processing.process_images(p_txt)
-        #state.job_count += len(processed.images)*factor_jobs
         final_images = []
         images_count = len(processed.images)
 
         if enable_detection_detailer_face_checkbox:
             ddetailer_model = preload_ddetailer_model("bbox/mmdet_anime-face_yolov3.pth")
+
+        model_location = dfm_model_dropdown
+        print(dfm_model_dropdown)
+        print(get_model_url(dfm_model_dropdown))
+        if get_model_url(dfm_model_dropdown) is not None:
+            download_url_name = get_model_url(dfm_model_dropdown)
+            download_location = str(dfl_options.get_dfl_path()) + "/" + os.path.basename(download_url_name)
+            state.job = f"Downloading model " + dfm_model_dropdown + " from " + download_url_name + " to " + download_location
+            download_url(download_url_name, str(dfl_options.get_dfl_path()))
+            model_location = download_url_name.split("/")[-1]
+            state.job_no += 1
 
         for image_n, current_image in enumerate(processed.images):
             text_generation = f"Generation {(image_n+1)} out of {images_count}"
@@ -475,7 +504,7 @@ class DeepFaceLive(scripts.Script):
         for batch in batches:
             if dfm_model_dropdown != "None":
                 output_images_itteration = self.process_frames(images=batch,
-                                    dfm_model_dropdown=dfm_model_dropdown,
+                                    dfm_model_dropdown=model_location,
                                     step_1_detector_input=step_1_detector_input,
                                     step_1_window_size_input=step_1_window_size_input,
                                     step_1_threshold_input=step_1_threshold_input,

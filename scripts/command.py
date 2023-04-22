@@ -17,7 +17,7 @@ from modelhub import onnx as onnx_models
 from modelhub import cv as cv_models
 from apps.DeepFaceLive.backend.BackendBase import (BackendFaceSwapInfo)
 from pathlib import Path
-from modelhub.DFLive.DFMModel import DFMModel
+from modelhub.DFLive.DFMModel import DFMModel, get_available_models_info
 
 class DetectorType(IntEnum):
     CENTER_FACE = 0
@@ -627,6 +627,20 @@ def step_4_face_swapper_remote(faces_array,
             fsi.face_swap_mask_image = np.array(cv2.imread(face_id[1][2]))
 
     return faces_array
+
+def get_downloadable_models(models_path, available_models):
+    models_info = get_available_models_info(models_path)
+    return_models = []
+    model_names = []
+    for available_model in available_models:
+        model_names.append(os.path.basename(available_model))
+
+    for model in models_info:
+        url = model.get_url()
+        if url is not None and os.path.basename(model.get_model_path()) not in model_names:
+            return_models.append([model.get_name(), url])
+
+    return return_models
 
 # Here is step 4 called through the remote function, which is called from the web UI
 if __name__ == '__main__':
