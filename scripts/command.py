@@ -508,7 +508,7 @@ def execute_deep_face_live_multiple( numpy_images,
     print("Step 4. Face Swapper")
     faces_array = step_4_face_swapper_remote(faces_array=faces_array,
                                 dfm_model=dfm_path,
-                                device_id=device_id,
+                                device_id=1,
                                 swap_all_faces=step_4_swap_all_faces,
                                 selected_face_id=int(step_4_face_id),
                                 pre_gamma=[step_4_pre_gamma_red, step_4_pre_gamma_green, step_4_pre_gamma_blue],

@@ -16,7 +16,7 @@ if not launch.is_installed("numexpr"):
     launch.run_pip("install numexpr", "requirements for DeepFaceLab - numexpr")
 
 if not launch.is_installed("h5py"):
-    launch.run_pip("install h5py==2.10.0", "requirements for DeepFaceLab - h5py")
+    launch.run_pip("install h5py", "requirements for DeepFaceLab - h5py")
 
 if not launch.is_installed("opencv-python"):
     launch.run_pip("install opencv-python", "requirements for DeepFaceLab - opencv-python")
@@ -46,8 +46,10 @@ if not launch.is_installed("tf2onnx"):
     launch.run_pip("install tf2onnx", "requirements for DeepFaceLab - tf2onnx")
 
 # Cpu Only Version
-# if not launch.is_installed("onnxruntime"):
-#     launch.run_pip("install onnxruntime", "requirements for DeepFaceLab - onnxruntime")
+if not launch.is_installed("onnxruntime"):
+    launch.run_pip("install onnxruntime", "requirements for DeepFaceLab - onnxruntime")
+
+#launch.run_pip("install onnx", "requirements for DeepFaceLab - onnx")
 
 # Gpu Version
 if not launch.is_installed("onnxruntime-gpu") or launch.get_package_version("onnxruntime-gpu") != '1.12.1':

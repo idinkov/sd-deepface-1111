@@ -31,6 +31,8 @@ dfl_options = DflOptions(opts)
 
 def list_models(include_downloadable=True):
     dfl_dropdown = []
+    dfl_dropdown.append("None")
+    #dfl_dropdown.append("Automatic")
     dfl_list = dfl_options.get_dfl_list(include_downloadable)
     for dfl in dfl_list:
         dfl_dropdown.append(dfl[0])
@@ -69,9 +71,9 @@ def startup():
     from launch import is_installed, run
     if not is_installed("mmdet"):
         python = sys.executable
-        run(f'"{python}" -m pip install -U openmim', desc="Installing openmim", errdesc="Couldn't install openmim")
-        run(f'"{python}" -m mim install mmcv-full', desc=f"Installing mmcv-full", errdesc=f"Couldn't install mmcv-full")
-        run(f'"{python}" -m pip install mmdet', desc=f"Installing mmdet", errdesc=f"Couldn't install mmdet")
+        run(f'"{python}" -m pip install -U openmim==0.3.7', desc="Installing openmim", errdesc="Couldn't install openmim")
+        run(f'"{python}" -m mim install mmcv-full==1.7.1', desc=f"Installing mmcv-full", errdesc=f"Couldn't install mmcv-full")
+        run(f'"{python}" -m pip install mmdet==2.28.2', desc=f"Installing mmdet", errdesc=f"Couldn't install mmdet")
 
     if (DflFiles.folder_exists(dd_models_path) == False):
         print("No detection models found, downloading...")
@@ -93,6 +95,7 @@ class DeepFaceLive(scripts.Script):
     def show(self, is_img2img):
         return True
 
+
     def ui(self, is_img2img):
         import modules.ui
 
@@ -103,10 +106,11 @@ class DeepFaceLive(scripts.Script):
             with gr.Row():
                 dfm_model_dropdown = gr.Dropdown(label="DFM Model", choices=list_models(True), value="None", visible=True, type="value")
                 create_refresh_button(dfm_model_dropdown, lambda: None, lambda: {"choices": list_models(True)}, "refresh_dfm_model_list")
+                
 
             with gr.Row():
                 image_return_original_checkbox = gr.Checkbox(label="Return original image")
-                enable_detection_detailer_face_checkbox = gr.Checkbox(label="Enable Detection Detailer for face", value=True)
+                enable_detection_detailer_face_checkbox = gr.Checkbox(label="Enable Detection Detailer for face", value=False)
                 save_detection_detailer_image_checkbox = gr.Checkbox(label="Return Detection Detailer Image")
 
         with gr.Group(elem_id="dfl_settings"):
@@ -405,14 +409,15 @@ class DeepFaceLive(scripts.Script):
             ):
         processing.fix_seed(p)
         seed = p.seed
+        initial_info = None
         p.do_not_save_grid = True
         p.do_not_save_samples = True
         is_txt2img = isinstance(p, StableDiffusionProcessingTxt2Img)
+        p_txt = p
         print(step_1_threshold_input)
         if (not is_txt2img):
             orig_image = p.init_images[0]
         else:
-            p_txt = p
             p = StableDiffusionProcessingImg2Img(
                 batch_size=p_txt.batch_size,
                 init_images=None,
@@ -459,6 +464,8 @@ class DeepFaceLive(scripts.Script):
             factor_jobs += 1
         state.job_count = p_txt.n_iter + (p_txt.n_iter * p_txt.batch_size)*factor_jobs + add_job_count
         processed = processing.process_images(p_txt)
+        if initial_info is None:
+            initial_info = processed.info
         final_images = []
         images_count = len(processed.images)
 
@@ -486,23 +493,24 @@ class DeepFaceLive(scripts.Script):
             else:
                 init_image = orig_image
 
-            if image_return_original_checkbox or dfm_model_dropdown == "None":
+            if image_return_original_checkbox or (dfm_model_dropdown == "None" and not enable_detection_detailer_face_checkbox):
                 output_images.append(init_image)
 
             if enable_detection_detailer_face_checkbox:
                 ddscript = DetectionDetailerScript()
                 last_no = state.job_no
+                p.prompt = p_txt.prompt
                 init_image = ddscript.run(p=p, model=ddetailer_model, model_name="bbox/mmdet_anime-face_yolov3.pth", init_image=init_image)
                 if last_no == state.job_no:
                     state.job_no += 1
-                if save_detection_detailer_image_checkbox:
+                if save_detection_detailer_image_checkbox or dfm_model_dropdown == "None":
                     output_images.append(init_image)
 
             final_images.append(init_image)
 
-        batches = self.generate_batches(final_images, batch_size_dfl)
-        for batch in batches:
-            if dfm_model_dropdown != "None":
+        if dfm_model_dropdown != "None":
+            batches = self.generate_batches(final_images, batch_size_dfl)
+            for batch in batches:
                 output_images_itteration = self.process_frames(images=batch,
                                     dfm_model_dropdown=model_location,
                                     step_1_detector_input=step_1_detector_input,
@@ -548,7 +556,10 @@ class DeepFaceLive(scripts.Script):
 
                 state.job_no += 1
 
-        return Processed(p, output_images, seed, "")
+        if initial_info is None:
+            initial_info = "No initial info"
+
+        return Processed(p, output_images, seed, initial_info)
 
 
 

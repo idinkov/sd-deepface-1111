@@ -226,7 +226,9 @@ class DflOptions:
             downloable_files = self.get_downloadable_models(dir_files_one)
             tmp_files = []
             for f in downloable_files:
-                tmp_files.append([f[0] + " (To Download)", f[1]])
+                # Get basename from url
+                basename = os.path.basename(f[1])
+                tmp_files.append([basename, f[1]])
             return dir_files + tmp_files
         return dir_files
 
