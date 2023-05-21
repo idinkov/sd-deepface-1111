@@ -413,11 +413,11 @@ class DeepFaceLive(scripts.Script):
         p.do_not_save_grid = True
         p.do_not_save_samples = True
         is_txt2img = isinstance(p, StableDiffusionProcessingTxt2Img)
-        p_txt = p
         print(step_1_threshold_input)
         if (not is_txt2img):
             orig_image = p.init_images[0]
         else:
+            p_txt = p
             p = StableDiffusionProcessingImg2Img(
                 batch_size=p_txt.batch_size,
                 init_images=None,
@@ -450,6 +450,7 @@ class DeepFaceLive(scripts.Script):
             )
             p.do_not_save_grid = True
             p.do_not_save_samples = True
+            p.prompt = p_txt.prompt
 
         import math
         output_images = []
@@ -459,11 +460,11 @@ class DeepFaceLive(scripts.Script):
         if dfm_model_dropdown != "None":
             if get_model_url(dfm_model_dropdown) is not None:
                 add_job_count += 1
-            add_job_count = math.ceil((p_txt.n_iter * p_txt.batch_size)/batch_size_dfl)
+            add_job_count = math.ceil((p.n_iter * p.batch_size)/batch_size_dfl)
         if enable_detection_detailer_face_checkbox:
             factor_jobs += 1
-        state.job_count = p_txt.n_iter + (p_txt.n_iter * p_txt.batch_size)*factor_jobs + add_job_count
-        processed = processing.process_images(p_txt)
+        state.job_count = p.n_iter + (p.n_iter * p.batch_size)*factor_jobs + add_job_count
+        processed = processing.process_images(p_txt if is_txt2img else p)
         if initial_info is None:
             initial_info = processed.info
         final_images = []
@@ -499,7 +500,7 @@ class DeepFaceLive(scripts.Script):
             if enable_detection_detailer_face_checkbox:
                 ddscript = DetectionDetailerScript()
                 last_no = state.job_no
-                p.prompt = p_txt.prompt
+
                 init_image = ddscript.run(p=p, model=ddetailer_model, model_name="bbox/mmdet_anime-face_yolov3.pth", init_image=init_image)
                 if last_no == state.job_no:
                     state.job_no += 1
