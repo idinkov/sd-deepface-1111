@@ -68,13 +68,6 @@ def list_align_modes():
     return ['From rectangle', 'From points', 'From static rect']
 
 def startup():
-    from launch import is_installed, run
-    if not is_installed("mmdet"):
-        python = sys.executable
-        run(f'"{python}" -m pip install -U openmim==0.3.7', desc="Installing openmim", errdesc="Couldn't install openmim")
-        run(f'"{python}" -m mim install mmcv-full==1.7.1', desc=f"Installing mmcv-full", errdesc=f"Couldn't install mmcv-full")
-        run(f'"{python}" -m pip install mmdet==2.28.2', desc=f"Installing mmdet", errdesc=f"Couldn't install mmdet")
-
     if (DflFiles.folder_exists(dd_models_path) == False):
         print("No detection models found, downloading...")
         bbox_path = os.path.join(dd_models_path, "bbox")

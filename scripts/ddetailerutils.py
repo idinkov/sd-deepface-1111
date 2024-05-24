@@ -76,7 +76,6 @@ class DetectionDetailerScript():
         return output_image
 
 import mmcv
-from mmdet.core import get_classes
 from mmdet.apis import (inference_detector,
                         init_detector)
 
@@ -180,7 +179,6 @@ def inference_mmdet_segm(image, model, modelname, conf_thres):
     mmdet_results = inference_detector(model, np.array(image))
     bbox_results, segm_results = mmdet_results
     dataset = modeldataset(modelname)
-    classes = get_classes(dataset)
     labels = [
         np.full(bbox.shape[0], i, dtype=np.int32)
         for i, bbox in enumerate(bbox_results)
